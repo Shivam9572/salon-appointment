@@ -345,6 +345,20 @@ const { handleNearMeClick } = useNearMe();
                         <motion.div
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.05 }}
+                        >
+                          <Link
+                            href="/my-bookings"
+                            onClick={() => setShowUserMenu(false)}
+                            className="flex items-center gap-2 px-4 py-2.5 text-white/70 hover:text-white hover:bg-white/5 text-sm transition-colors"
+                          >
+                            
+                            My appointments
+                          </Link>
+                        </motion.div>
+                        <motion.div
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: 0.1 }}
                         >
                           <button

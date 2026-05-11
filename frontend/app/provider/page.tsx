@@ -9,6 +9,7 @@ import ServicePanel from "../../components/provider/servicePannel";
 import { Service } from "../../components/provider/servicePannel";
 import ProviderProfile, { ProviderProfileType } from "../../components/provider/profile";
 import dynamic from "next/dynamic";
+import AppointmentHistory from "../../components/provider/appointments";
 
 const MapModal = dynamic(
   () => import("@/components/provider/mapModal"),
@@ -16,7 +17,7 @@ const MapModal = dynamic(
     ssr: false,
   }
 );
-import { connectSocket, disconnectSocket ,getSocket} from '../../lib/socket';
+import { connectSocket, disconnectSocket, getSocket } from '../../lib/socket';
 
 
 export default function ProviderHomePage() {
@@ -38,7 +39,7 @@ function ProviderHomeContent() {
   const [providerCategories, setProviderCategories] = useState<Array<any>>([]);
   const [profile, setProfile] = useState<ProviderProfileType>();
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"staff" | "categories" | "services" | "profile">("staff");
+  const [activeTab, setActiveTab] = useState<"staff" | "categories" | "services" | "profile" | "appointments">("staff");
   // existing states ke neeche add karo
   const [isConnected, setIsConnected] = useState(false);
   const [chairCount, setChairCount] = useState<number>(0);
@@ -349,7 +350,7 @@ function ProviderHomeContent() {
 
       {/* Tab Nav */}
       <nav style={{ display: "flex", gap: 8, marginBottom: 20, borderBottom: "2px solid #f3f4f6" }}>
-        {(["staff", "categories", "services", "profile"] as const).map((tab) => (
+        {(["staff", "categories", "services", "profile","appointments"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -363,7 +364,7 @@ function ProviderHomeContent() {
               transition: "color 0.15s, border-color 0.15s",
             }}
           >
-            {tab === "staff" ? "👥 Staff" : tab === "categories" ? "🗂 Categories" : tab === "services" ? "💼 Services" : "👤 Profile"}
+            {tab === "staff" ? "👥 Staff" : tab === "categories" ? "🗂 Categories" : tab === "services" ? "💼 Services" : tab === "appointments"?"💼 appointments":"profile"}
           </button>
         ))}
       </nav>
@@ -376,7 +377,7 @@ function ProviderHomeContent() {
           onUnauthorized={handleLogout}
           deleteStaff={deleteStaff}
           isProviderConnected={isConnected}  // ✅
-        socket={getSocket()}
+          socket={getSocket()}
         />
       )}
 
@@ -396,7 +397,11 @@ function ProviderHomeContent() {
         activeTab === "profile" && (
           <ProviderProfile data={profile} onUpdate={onUpdateProfile} onUnauthorized={handleLogout} />
         )
+
       }
+      {activeTab === "appointments" && (
+        <AppointmentHistory onUnauthorized={handleLogout} />
+      )}
       {showMap && (
         <MapModal
           onClose={() => setShowMap(false)}

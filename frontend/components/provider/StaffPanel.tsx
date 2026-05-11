@@ -250,18 +250,7 @@ export default function StaffPanel({ staff, onAdd, onUnauthorized, deleteStaff, 
                                 </button>
 
                                 {/* EDIT */}
-                                <button onClick={() => {
-                                    setEditStaff(s)
-                                    setEditStaffModal(true)
-                                }} style={{
-                                    background: "var(--gold, #f59e0b)", border: "none",
-                                    padding: "7px 4px", borderRadius: 8,
-                                    fontWeight: 600, fontSize: 13, cursor: "pointer",
-                                    display: "flex", alignItems: "center", gap: 6,
-                                }}>
-
-                                    ✏️
-                                </button>
+                               
 
                                 {/* DELETE */}
                                 <button onClick={() => handleDelete(s.id, s.phone)}>

@@ -94,7 +94,32 @@ Appointment.belongsTo(User, {
   as: "customer",
 });
 
+// appointment.js
+Appointment.belongsTo(ProviderService, {
+  foreignKey: 'service_id',
+  targetKey: 'service_id',
+  constraints: false
+});
 
+Appointment.belongsTo(ProviderService, {
+  foreignKey: 'staff_id',
+  targetKey: 'staff_id',
+  constraints: false
+});
+
+
+// providerServices.js
+ProviderService.hasMany(Appointment, {
+  foreignKey: 'service_id',
+  sourceKey: 'service_id',
+  constraints: false
+});
+
+ProviderService.hasMany(Appointment, {
+  foreignKey: 'staff_id',
+  sourceKey: 'staff_id',
+  constraints: false
+});
 
 // ======================================================
 // PROVIDER ↔ APPOINTMENT
@@ -128,6 +153,8 @@ Appointment.belongsTo(Staff, {
   as: "staff",
 });
 
+
+//category<->appointment
 
 
 // ======================================================

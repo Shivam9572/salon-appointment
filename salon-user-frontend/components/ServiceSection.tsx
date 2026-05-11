@@ -48,7 +48,7 @@ const categoryIcons: Record<string, { icon: any; color: string }> = {
 const categoryImages = [
   "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=300&fit=crop",
   "https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?w=400&h=300&fit=crop",
-  "https://images.unsplash.com/photo-1633681926022-84c23e8cb3d6?w=400&h=300&fit=crop",
+  
   "https://images.unsplash.com/photo-1595476108010-b4d1f102b1b1?w=400&h=300&fit=crop",
   "https://images.unsplash.com/photo-1585747860715-2ba37e788b70?w=400&h=300&fit=crop",
   "https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?w=400&h=300&fit=crop",

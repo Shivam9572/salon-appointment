@@ -1,8 +1,8 @@
 // controllers/appointment.controller.js
 
-import { Op } from "sequelize";
+import { Sequelize, Op, where } from "sequelize";
 
-import {Appointment,Provider,Service, Staff ,Chair, User, ProviderService} from "../models/association.js";
+import { Appointment, Provider, Service, Staff, Chair, User, ProviderService, Category } from "../models/association.js";
 
 
 
@@ -12,7 +12,7 @@ import {Appointment,Provider,Service, Staff ,Chair, User, ProviderService} from 
 
 export const getAvailableSlots = async (req, res) => {
   try {
-     const customerId = req.user.id;
+    const customerId = req.user.id;
     let { staffId, serviceId, providerId, date } = req.body;
 
     // ─── 1. User check ───────────────────────────────────────
@@ -46,84 +46,85 @@ export const getAvailableSlots = async (req, res) => {
     if (!staff.available) {
       return res.status(400).json({ success: false, message: "Staff is not available" });
     }
-    let providerService=await ProviderService.findOne({where:{provider_id:providerId,service_id:serviceId,staff_id:staffId}});
-    if(!providerService){
-      return res.status(404).json({success:false,message:"staff services not found"});
+    let providerService = await ProviderService.findOne({ where: { provider_id: providerId, service_id: serviceId, staff_id: staffId } });
+    if (!providerService) {
+      return res.status(404).json({ success: false, message: "staff services not found" });
     }
-   
-    let duration=parseInt((providerService.toJSON()).custom_duration);
-    if(!date){
-       date=new Date();  
-    }else{
-      date=new Date(date);
-      if(date.getDate()<(new Date).getDate()){
-        return res.status(409).json({success:false,message:"Appoinment not allow previous date"});
+
+    let duration = parseInt((providerService.toJSON()).custom_duration);
+    if (!date) {
+      date = new Date();
+    } else {
+      date = new Date(date);
+      if (date.getDate() < (new Date).getDate()) {
+        return res.status(409).json({ success: false, message: "Appoinment not allow previous date" });
       }
     }
-     provider=provider.toJSON();
-    let providerClosingTime=provider.closing_time.split(":");
-    let providerOpeningTime=provider.opening_time.split(":");
-    
-     if(date.getHours()>providerClosingTime[0]){
-      return res.status(404).json({success:false,message:"shop is now close"});
-     }
-   let starttime=date;
-   starttime.setDate(starttime.getDate());
-   starttime.setHours(providerOpeningTime[0],0,0,0);
-   let endTime=new Date();
-   endTime.setDate(endTime.getDate()+1);
-   endTime.setHours(providerClosingTime[0],0,0,0);
-   
+    provider = provider.toJSON();
+    let providerClosingTime = provider.closing_time.split(":");
+    let providerOpeningTime = provider.opening_time.split(":");
+
+    if (date.getHours() > providerClosingTime[0]) {
+      return res.status(404).json({ success: false, message: "shop is now close" });
+    }
+    let starttime = date;
+    starttime.setDate(starttime.getDate());
+    starttime.setHours(providerOpeningTime[0], 0, 0, 0);
+    let endTime = new Date();
+    endTime.setDate(endTime.getDate() + 1);
+    endTime.setHours(providerClosingTime[0], 0, 0, 0);
+
     // ─── 7. Get booked appointments for that date ─────────────
     let bookedAppointments = await Appointment.findAll({
       where: {
         staff_id: staffId,
         provider_id: providerId,
         status: { [Op.notIn]: ["cancelled", "completed"] },
-        start_time:{[Op.between]:[date,endTime]}
+        start_time: { [Op.between]: [date, endTime] }
       },
       attributes: ["start_time", "end_time"],
-      order:[["start_time","ASC"]]
+      order: [["start_time", "ASC"]]
     });
 
-   
-   bookedAppointments=JSON.parse(JSON.stringify(bookedAppointments));
-   
-   providerOpeningTime=providerOpeningTime.map((s)=>{
-     return parseInt(s);
-   });
-   providerClosingTime=providerClosingTime.map((s)=>{
-     return parseInt(s);
-   });
-   let timeSlots=[];
-   let initTime=8*60+0;
-   
-    bookedAppointments.map((t)=>{
-        let start_time=new Date(t.start_time.toString());
-        let end_time=new Date(t.end_time.toString());
-        let start_hour=start_time.getHours()-5;
-        let end_hour=end_time.getHours()-5;
-         let start_minute=start_time.getMinutes()-30;
-        let end_minute=end_time.getMinutes()-30;
-        
-        if(start_hour*60+start_minute-duration > initTime){
-          
-          timeSlots.push({start:[parseInt(initTime/60),initTime%60],
-            end:[parseInt((start_hour*60+start_minute-duration)/60),(start_hour*60+start_minute-duration)%60]
-          });
-       
-        }
-      
-      initTime=end_hour*60+end_minute;
+
+    bookedAppointments = JSON.parse(JSON.stringify(bookedAppointments));
+
+    providerOpeningTime = providerOpeningTime.map((s) => {
+      return parseInt(s);
     });
-    if(initTime < (providerClosingTime[0]*60)+providerClosingTime[1]-duration){
+    providerClosingTime = providerClosingTime.map((s) => {
+      return parseInt(s);
+    });
+    let timeSlots = [];
+    let initTime = 8 * 60 + 0;
+
+    bookedAppointments.map((t) => {
+      let start_time = new Date(t.start_time.toString());
+      let end_time = new Date(t.end_time.toString());
+      let start_hour = start_time.getHours() - 5;
+      let end_hour = end_time.getHours() - 5;
+      let start_minute = start_time.getMinutes() - 30;
+      let end_minute = end_time.getMinutes() - 30;
+
+      if (start_hour * 60 + start_minute - duration > initTime) {
+
+        timeSlots.push({
+          start: [parseInt(initTime / 60), initTime % 60],
+          end: [parseInt((start_hour * 60 + start_minute - duration) / 60), (start_hour * 60 + start_minute - duration) % 60]
+        });
+
+      }
+
+      initTime = end_hour * 60 + end_minute;
+    });
+    if (initTime < (providerClosingTime[0] * 60) + providerClosingTime[1] - duration) {
       timeSlots.push({
-        start:[parseInt(initTime/60),initTime%60],
-        end:[parseInt(((providerClosingTime[0]*60)+providerClosingTime[1]-duration)/60),providerClosingTime[1]]
+        start: [parseInt(initTime / 60), initTime % 60],
+        end: [parseInt(((providerClosingTime[0] * 60) + providerClosingTime[1] - duration) / 60), providerClosingTime[1]]
       });
     }
-   
-   return res.status(200).json({success:true,timeSlots});
+
+    return res.status(200).json({ success: true, timeSlots });
 
   } catch (error) {
     console.error("Error in getAvailableSlots:", error);
@@ -187,23 +188,10 @@ export const createAppointment = async (req, res) => {
         status: {
           [Op.notIn]: ["cancelled", "completed"],
         },
-        [Op.or]: [
-          {
-            start_time: {
-              [Op.between]: [start_time, end_time],
-            },
-          },
-          {
-            end_time: {
-              [Op.between]: [start_time, end_time],
-            },
-          },
-          {
-            [Op.and]: [
-              { start_time: { [Op.lte]: start_time } },
-              { end_time: { [Op.gte]: end_time } }
-            ]
-          }
+
+        [Op.and]: [
+          { start_time: { [Op.lt]: end_time } },   // existing starts before new ends
+          { end_time: { [Op.gt]: start_time } },  // existing ends after new starts
         ],
       },
     });
@@ -251,14 +239,19 @@ export const createAppointment = async (req, res) => {
 
 export const getUserAppointments = async (req, res) => {
   try {
-    const customer_id = req.user.id;
+    const id = req.user.id;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
+    const user = await User.findOne({ where: { id } });
+    if (!user) {
+      res.status(404).json({ success: false, message: "user not found" });
+    }
+
     const { count, rows: appointments } = await Appointment.findAndCountAll({
       where: {
-        customer_id,
+        customer_id: id,
       },
       include: [
         {
@@ -269,16 +262,26 @@ export const getUserAppointments = async (req, res) => {
             "salonAddress",
             "salonContact",
           ],
+          as: "provider"
         },
         {
-          model: Service,
+          model: ProviderService,
           attributes: [
-            "id",
-            "name",
-            "price",
-            "duration",
+            "custom_price",
+            "custom_duration",
+            "custom_description",
           ],
+          on: {
+            service_id: { [Op.col]: 'appointment.service_id' },
+            staff_id: { [Op.col]: 'appointment.staff_id' }
+          },
+          required: true,
+          include: [{
+            model: Service,
+            attributes: ["name"]
+          }]
         },
+
         {
           model: Staff,
           attributes: [
@@ -286,14 +289,8 @@ export const getUserAppointments = async (req, res) => {
             "name",
             "phone",
           ],
-        },
-        {
-          model: Chair,
-          attributes: [
-            "id",
-            "name",
-          ],
-        },
+          as: "staff"
+        }
       ],
       order: [["createdAt", "DESC"]],
       limit,
@@ -401,7 +398,7 @@ export const getAppointmentDetails = async (req, res) => {
 // ======================================
 
 export const cancelAppointment = async (req, res) => {
-
+    
   try {
 
     const { appointmentId } = req.params;
@@ -468,3 +465,91 @@ export const cancelAppointment = async (req, res) => {
   }
 
 };
+
+export const getProviderAppointment = async (req, res) => {
+  const id = req.user.id;
+     const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+  try {
+    const provider = await Provider.findOne({ where: { id } });
+    if (!provider) {
+      return res.status(404).json({ success: false, message: "provider is not found" });
+    }
+    const  { count, rows: appointments } = await Appointment.findAndCountAll({
+      where: { provider_id: id },
+      attributes:["id","start_time","end_time","status","createdAt"],
+      include: [{
+        model: Staff,
+        attributes:["name","phone","available"],
+        as:"staff"
+      }, {
+        model: User,
+        attributes:["name","email","address","mobile"],
+        as:"customer"
+        
+      },{
+        model: ProviderService,
+        attributes: [
+          "custom_price",
+          "custom_duration",
+          "custom_description",
+        ],
+        on: {
+          service_id: { [Op.col]: 'appointment.service_id' },
+          staff_id: { [Op.col]: 'appointment.staff_id' }
+        },
+        required: true,
+        include: [{
+          model: Service,
+          attributes: ["name"]
+        },{
+          model:Category,
+          attributes:["name"]
+        }]
+      }
+      ],
+      limit,
+      offset,
+      order:[["createdAt","DESC"]]
+    }
+    );
+    return res.status(200).json({ success: true, message: appointments, pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(count / limit),
+        totalItems: count,
+        itemsPerPage: limit,
+      }, });
+
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+}
+
+export const setAppointmentStatus=async(req,res)=>{
+     const id=req.user.id;
+          try {
+     const {appointmentId}=req.params;
+     const {status}=req.query;
+       if(status!="rejected" || status==="comfirmed" || "competed"){
+         const provider=await Provider.findOne({where:{id}});
+        if(!provider){
+          return res.status(404).json({success:false,message:"provider not found"});
+        }
+        const  appointment=await Appointment.findOne({where:{id:appointmentId,provider_id:id}});
+        if(!appointment){
+         return res.status(404).json({success:false,message:"appointment not found"});
+ 
+        }
+        appointment.status=status;
+        await appointment.save();
+       return  res.status(200).json({success:true,message:"status changed successfull"})
+       }
+       res.status(429).json({success:false,messgae:"invalid status"});
+       
+     } catch (error) {
+      console.log(error);
+      res.status(500).json({success:"false",message:error.message});
+     }
+}

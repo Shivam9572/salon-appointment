@@ -18,7 +18,6 @@ import {
   XCircle,
   Clock as ClockIcon,
   Phone,
-  Mail,
   Calendar as CalendarIcon,
   ArrowLeft,
 } from "lucide-react";
@@ -28,30 +27,34 @@ import Link from "next/link";
 
 interface Appointment {
   id: string;
+  customer_id: string;
+  provider_id: string;
+  staff_id: string;
+  service_id: string;
+  chair_id: string | null;
   start_time: string;
   end_time: string;
   status: "pending" | "confirmed" | "completed" | "cancelled";
   createdAt: string;
-  Provider: {
+  updatedAt: string;
+  provider: {
     id: string;
     salonName: string;
     salonAddress: string;
     salonContact: string;
   };
-  Service: {
-    id: string;
-    name: string;
-    price: string;
-    duration: number;
-  };
-  Staff: {
+  staff: {
     id: string;
     name: string;
     phone: string;
   };
-  Chair?: {
-    id: string;
-    name: string;
+  ProviderService: {
+    custom_price: string;
+    custom_duration: number;
+    custom_description: string;
+    Service: {
+      name: string;
+    };
   };
 }
 
@@ -72,6 +75,7 @@ export default function MyBookingsPage() {
   const [pagination, setPagination] = useState<PaginationData | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -85,7 +89,7 @@ export default function MyBookingsPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await apiFetch(`/appointments?page=${currentPage}&limit=10`);
+      const response = await apiFetch(`/appointment?page=${currentPage}&limit=10`);
       const data = await response.json();
 
       if (data.success) {
@@ -105,6 +109,7 @@ export default function MyBookingsPage() {
   const handleCancelAppointment = async (appointmentId: string) => {
     if (!confirm("Are you sure you want to cancel this appointment?")) return;
 
+    setCancellingId(appointmentId);
     try {
       const response = await apiFetch(`/appointment/${appointmentId}/cancel`, {
         method: "PUT",
@@ -120,11 +125,9 @@ export default function MyBookingsPage() {
     } catch (error) {
       console.error("Error cancelling appointment:", error);
       alert("Network error. Please try again.");
+    } finally {
+      setCancellingId(null);
     }
-  };
-
-  const handleReschedule = (appointmentId: string) => {
-    router.push(`/reschedule/${appointmentId}`);
   };
 
   const viewDetails = (appointment: Appointment) => {
@@ -162,22 +165,55 @@ export default function MyBookingsPage() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+  // Direct format without timezone conversion
+  const formatDateOnly = (dateString: string) => {
+    // Extract date part only (YYYY-MM-DD)
+    const datePart = dateString.split('T')[0];
+    const [year, month, day] = datePart.split('-');
+    return `${day}/${month}/${year}`;
+  };
+
+  const formatTimeOnly = (dateString: string) => {
+    // Extract time from ISO string and convert to 12-hour format
+    const timePart = dateString.split('T')[1]?.split('.')[0]; // Get HH:MM:SS
+    if (!timePart) return '';
+    
+    let [hours, minutes] = timePart.split(':');
+    let hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12 || 12;
+    return `${hour}:${minutes} ${ampm}`;
+  };
+
+  // Full date format: "May 11, 2026"
+  const formatFullDate = (dateString: string) => {
+    const datePart = dateString.split('T')[0];
+    const [year, month, day] = datePart.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
       month: 'long',
-      day: 'numeric'
+      day: 'numeric',
+      year: 'numeric'
     });
   };
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const getServiceName = (appointment: Appointment) => {
+    return appointment.ProviderService?.Service?.name || "Service";
+  };
+
+  const getServicePrice = (appointment: Appointment) => {
+    return parseFloat(appointment.ProviderService?.custom_price || "0");
+  };
+
+  const getServiceDuration = (appointment: Appointment) => {
+    return appointment.ProviderService?.custom_duration || 0;
+  };
+
+  // Check if appointment is in the past
+  const isPastAppointment = (appointment: Appointment) => {
+    const now = new Date();
+    const appointmentEnd = new Date(appointment.end_time);
+    return appointmentEnd < now;
   };
 
   if (!isLoggedIn) {
@@ -241,100 +277,112 @@ export default function MyBookingsPage() {
           <>
             {/* Appointments List */}
             <div className="space-y-4">
-              {appointments.map((appointment, index) => (
-                <motion.div
-                  key={appointment.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="bg-gradient-to-br from-[#12121a] to-[#1a1a24] rounded-2xl border border-white/10 p-6 hover:border-white/20 transition-all"
-                >
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                    {/* Left Section - Salon Info */}
-                    <div className="flex-1">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#c9a96e]/20 to-[#e8c88a]/20 flex items-center justify-center shrink-0">
-                          <Scissors className="w-6 h-6 text-[#c9a96e]" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 flex-wrap mb-2">
-                            <h3 className="text-lg font-semibold text-white">
-                              {appointment.Provider.salonName}
-                            </h3>
-                            <span className={`px-2 py-0.5 rounded-full text-xs border ${getStatusColor(appointment.status)}`}>
-                              <span className="flex items-center gap-1">
-                                {getStatusIcon(appointment.status)}
-                                {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-                              </span>
-                            </span>
+              {appointments.map((appointment, index) => {
+                const isPast = isPastAppointment(appointment);
+                const startDate = formatFullDate(appointment.start_time);
+                const startTime = formatTimeOnly(appointment.start_time);
+                const endTime = formatTimeOnly(appointment.end_time);
+                
+                return (
+                  <motion.div
+                    key={appointment.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className={`bg-gradient-to-br from-[#12121a] to-[#1a1a24] rounded-2xl border p-6 hover:border-white/20 transition-all ${
+                      isPast ? 'border-white/5 opacity-75' : 'border-white/10'
+                    }`}
+                  >
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                      {/* Left Section - Salon Info */}
+                      <div className="flex-1">
+                        <div className="flex items-start gap-4">
+                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#c9a96e]/20 to-[#e8c88a]/20 flex items-center justify-center shrink-0">
+                            <Scissors className="w-6 h-6 text-[#c9a96e]" />
                           </div>
-                          <div className="space-y-1 text-sm">
-                            <div className="flex items-center gap-2 text-white/60">
-                              <CalendarIcon className="w-3.5 h-3.5" />
-                              <span>{formatDate(appointment.start_time)}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-white/60">
-                              <Clock className="w-3.5 h-3.5" />
-                              <span>
-                                {formatTime(appointment.start_time)} - {formatTime(appointment.end_time)}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 flex-wrap mb-2">
+                              <h3 className="text-lg font-semibold text-white">
+                                {appointment.provider.salonName}
+                              </h3>
+                              <span className={`px-2 py-0.5 rounded-full text-xs border ${getStatusColor(appointment.status)}`}>
+                                <span className="flex items-center gap-1">
+                                  {getStatusIcon(appointment.status)}
+                                  {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+                                </span>
                               </span>
-                              <span className="text-white/40">
-                                ({appointment.Service.duration} min)
-                              </span>
+                              {isPast && appointment.status === "pending" && (
+                                <span className="px-2 py-0.5 rounded-full text-xs border bg-gray-500/20 text-gray-400 border-gray-500/30">
+                                  Expired
+                                </span>
+                              )}
                             </div>
-                            <div className="flex items-center gap-2 text-white/60">
-                              <MapPin className="w-3.5 h-3.5" />
-                              <span>{appointment.Provider.salonAddress}</span>
+                            <div className="space-y-1 text-sm">
+                              <div className="flex items-center gap-2 text-white/60">
+                                <CalendarIcon className="w-3.5 h-3.5" />
+                                <span>{startDate}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-white/60">
+                                <Clock className="w-3.5 h-3.5" />
+                                <span>
+                                  {startTime} - {endTime}
+                                </span>
+                                <span className="text-white/40">
+                                  ({getServiceDuration(appointment)} min)
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-white/60">
+                                <MapPin className="w-3.5 h-3.5" />
+                                <span className="truncate">{appointment.provider.salonAddress}</span>
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Center Section - Service & Staff */}
-                    <div className="flex flex-col sm:flex-row gap-4 px-0 lg:px-6 py-4 lg:py-0 border-y lg:border-y-0 border-white/10">
-                      <div>
-                        <p className="text-white/40 text-xs mb-1">Service</p>
-                        <p className="text-white font-medium">{appointment.Service.name}</p>
-                        <p className="text-[#c9a96e] text-sm">₹{parseFloat(appointment.Service.price).toFixed(0)}</p>
-                      </div>
-                      <div>
-                        <p className="text-white/40 text-xs mb-1">Stylist</p>
-                        <div className="flex items-center gap-1">
-                          <User className="w-3.5 h-3.5 text-[#c9a96e]" />
-                          <p className="text-white font-medium">{appointment.Staff.name}</p>
+                      {/* Center Section - Service & Staff */}
+                      <div className="flex flex-col sm:flex-row gap-4 px-0 lg:px-6 py-4 lg:py-0 border-y lg:border-y-0 border-white/10">
+                        <div>
+                          <p className="text-white/40 text-xs mb-1">Service</p>
+                          <p className="text-white font-medium">{getServiceName(appointment)}</p>
+                          <p className="text-[#c9a96e] text-sm">₹{getServicePrice(appointment).toFixed(0)}</p>
+                        </div>
+                        <div>
+                          <p className="text-white/40 text-xs mb-1">Staff</p>
+                          <div className="flex items-center gap-1">
+                            <User className="w-3.5 h-3.5 text-[#c9a96e]" />
+                            <p className="text-white font-medium">{appointment.staff.name}</p>
+                          </div>
+                          <p className="text-white/40 text-xs mt-1">{appointment.staff.phone}</p>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Right Section - Actions */}
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <button
-                        onClick={() => viewDetails(appointment)}
-                        className="px-4 py-2 rounded-xl border border-white/20 text-white hover:bg-white/5 transition-all text-sm"
-                      >
-                        View Details
-                      </button>
-                      {appointment.status === "confirmed" && (
-                        <>
-                          <button
-                            onClick={() => handleReschedule(appointment.id)}
-                            className="px-4 py-2 rounded-xl border border-[#c9a96e] text-[#c9a96e] hover:bg-[#c9a96e]/10 transition-all text-sm"
-                          >
-                            Reschedule
-                          </button>
+                      {/* Right Section - Actions */}
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <button
+                          onClick={() => viewDetails(appointment)}
+                          className="px-4 py-2 rounded-xl border border-white/20 text-white hover:bg-white/5 transition-all text-sm"
+                        >
+                          View Details
+                        </button>
+                        {appointment.status === "pending" && !isPast && (
                           <button
                             onClick={() => handleCancelAppointment(appointment.id)}
-                            className="px-4 py-2 rounded-xl border border-red-500/50 text-red-400 hover:bg-red-500/10 transition-all text-sm"
+                            disabled={cancellingId === appointment.id}
+                            className="px-4 py-2 rounded-xl border border-red-500/50 text-red-400 hover:bg-red-500/10 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            Cancel
+                            {cancellingId === appointment.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                            ) : (
+                              "Cancel"
+                            )}
                           </button>
-                        </>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                );
+              })}
             </div>
 
             {/* Pagination */}
@@ -386,6 +434,13 @@ export default function MyBookingsPage() {
                 </button>
               </div>
             )}
+
+            {/* Pagination Info */}
+            {pagination && (
+              <div className="text-center text-white/40 text-sm mt-4">
+                Showing {appointments.length} of {pagination.totalItems} bookings
+              </div>
+            )}
           </>
         )}
       </div>
@@ -423,16 +478,16 @@ export default function MyBookingsPage() {
                   <div className="flex items-center gap-3 mb-2">
                     <Scissors className="w-5 h-5 text-[#c9a96e]" />
                     <h3 className="text-xl font-semibold text-white">
-                      {selectedAppointment.Provider.salonName}
+                      {selectedAppointment.provider.salonName}
                     </h3>
                   </div>
                   <div className="flex items-center gap-2 text-white/60 text-sm ml-8">
                     <MapPin className="w-3.5 h-3.5" />
-                    <span>{selectedAppointment.Provider.salonAddress}</span>
+                    <span>{selectedAppointment.provider.salonAddress}</span>
                   </div>
                   <div className="flex items-center gap-2 text-white/60 text-sm ml-8 mt-1">
                     <Phone className="w-3.5 h-3.5" />
-                    <span>{selectedAppointment.Provider.salonContact}</span>
+                    <span>{selectedAppointment.provider.salonContact}</span>
                   </div>
                 </div>
 
@@ -441,10 +496,10 @@ export default function MyBookingsPage() {
                   <div>
                     <p className="text-white/40 text-xs mb-1">Date & Time</p>
                     <p className="text-white font-medium">
-                      {formatDate(selectedAppointment.start_time)}
+                      {formatFullDate(selectedAppointment.start_time)}
                     </p>
                     <p className="text-[#c9a96e] text-sm">
-                      {formatTime(selectedAppointment.start_time)} - {formatTime(selectedAppointment.end_time)}
+                      {formatTimeOnly(selectedAppointment.start_time)} - {formatTimeOnly(selectedAppointment.end_time)}
                     </p>
                   </div>
                   <div>
@@ -461,11 +516,18 @@ export default function MyBookingsPage() {
                   <p className="text-white/40 text-xs mb-2">Service Details</p>
                   <div className="flex justify-between items-center">
                     <div>
-                      <p className="text-white font-medium">{selectedAppointment.Service.name}</p>
-                      <p className="text-white/60 text-sm">Duration: {selectedAppointment.Service.duration} minutes</p>
+                      <p className="text-white font-medium">{getServiceName(selectedAppointment)}</p>
+                      <p className="text-white/60 text-sm">
+                        Duration: {getServiceDuration(selectedAppointment)} minutes
+                      </p>
+                      {selectedAppointment.ProviderService?.custom_description && (
+                        <p className="text-white/40 text-sm mt-1">
+                          {selectedAppointment.ProviderService.custom_description}
+                        </p>
+                      )}
                     </div>
                     <p className="text-[#c9a96e] text-xl font-bold">
-                      ₹{parseFloat(selectedAppointment.Service.price).toFixed(0)}
+                      ₹{getServicePrice(selectedAppointment).toFixed(0)}
                     </p>
                   </div>
                 </div>
@@ -476,8 +538,8 @@ export default function MyBookingsPage() {
                   <div className="flex items-center gap-2">
                     <User className="w-4 h-4 text-[#c9a96e]" />
                     <div>
-                      <p className="text-white font-medium">{selectedAppointment.Staff.name}</p>
-                      <p className="text-white/60 text-sm">{selectedAppointment.Staff.phone}</p>
+                      <p className="text-white font-medium">{selectedAppointment.staff.name}</p>
+                      <p className="text-white/60 text-sm">{selectedAppointment.staff.phone}</p>
                     </div>
                   </div>
                 </div>
@@ -487,7 +549,7 @@ export default function MyBookingsPage() {
                   <p className="text-white/40 text-xs mb-2">Booking Information</p>
                   <div className="space-y-1 text-sm">
                     <p className="text-white/60">
-                      <span className="text-white/40">Booked on:</span> {new Date(selectedAppointment.createdAt).toLocaleDateString()}
+                      <span className="text-white/40">Booked on:</span> {formatFullDate(selectedAppointment.createdAt)} at {formatTimeOnly(selectedAppointment.createdAt)}
                     </p>
                     <p className="text-white/60">
                       <span className="text-white/40">Booking ID:</span> {selectedAppointment.id}
@@ -496,17 +558,8 @@ export default function MyBookingsPage() {
                 </div>
 
                 {/* Action Buttons */}
-                {selectedAppointment.status === "confirmed" && (
+                {selectedAppointment.status === "pending" && !isPastAppointment(selectedAppointment) && (
                   <div className="flex gap-3 pt-4">
-                    <button
-                      onClick={() => {
-                        setShowDetailsModal(false);
-                        handleReschedule(selectedAppointment.id);
-                      }}
-                      className="flex-1 px-4 py-2 rounded-xl border border-[#c9a96e] text-[#c9a96e] hover:bg-[#c9a96e]/10 transition-all"
-                    >
-                      Reschedule
-                    </button>
                     <button
                       onClick={() => {
                         setShowDetailsModal(false);

@@ -374,19 +374,7 @@ export default function BookingPage() {
       const startDateTime = createDateTime(selectedDate, selectedTime);
       const endDateTime = createDateTime(selectedDate, endTimeMinutes);
       
-      console.log("Booking data:", {
-        provider_id: providerId,
-        service_id: selectedService.service_id,
-        staff_id: selectedStaff.id,
-        start_time: startDateTime,
-        end_time: endDateTime,
-        customerName: bookingDetails.name || user?.name,
-        customerEmail: bookingDetails.email || user?.email,
-        customerPhone: bookingDetails.phone,
-        notes: bookingDetails.notes,
-        price: selectedService.custom_price,
-        duration: selectedService.custom_duration
-      });
+      
 
       const bookingData = {
         provider_id: providerId,
